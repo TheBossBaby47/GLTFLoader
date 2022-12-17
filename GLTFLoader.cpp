@@ -8,19 +8,19 @@
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 #include "tiny_gltf.h"
 
-#include "../../Common/Quaternion.h"
+#include "../NCLCoreClasses/Quaternion.h"
 
-#include "../../Common/Vector2.h"
-#include "../../Common/Vector3.h"
-#include "../../Common/Vector4.h"
+#include "../NCLCoreClasses/Vector2.h"
+#include "../NCLCoreClasses/Vector3.h"
+#include "../NCLCoreClasses/Vector4.h"
 
-#include "../../Common/Maths.h"
+#include "../NCLCoreClasses/Maths.h"
 
-#include "../../Common/TextureLoader.h"
-#include "../../Common/TextureBase.h"
+#include "../NCLCoreClasses/TextureLoader.h"
+#include "../NCLCoreClasses/TextureBase.h"
 
-#include "../../Common/MeshAnimation.h"
-#include "../../Common/MeshGeometry.h"
+#include "../NCLCoreClasses/MeshAnimation.h"
+#include "../NCLCoreClasses/MeshGeometry.h"
 
 #include <filesystem>
 #include <cmath>

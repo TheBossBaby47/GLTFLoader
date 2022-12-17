@@ -3,8 +3,8 @@
 #include <map>
 #include <string>
 #include <functional>
-#include "../../Common/Assets.h"
-#include "../../Common/Matrix4.h"
+#include "../NCLCoreClasses/Assets.h"
+#include "../NCLCoreClasses/Matrix4.h"
 
 namespace tinygltf {
 	class Model;
