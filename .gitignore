@@ -15,3 +15,7 @@
 /GLTFLoader.vcxproj
 /GLTFLoader.vcxproj.filters
 /cmake_install.cmake
+/GLTFLoader.dir/Release/*.recipe
+/GLTFLoader.dir/Release/GLTFLoader.tlog/*.tlog
+/GLTFLoader.dir/Release/GLTFLoader.tlog/*.lastbuildstate
+/GLTFLoader.dir/Release/*.txt
