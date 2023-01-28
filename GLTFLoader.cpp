@@ -166,17 +166,8 @@ vecType GetInterpolatedVector(float t, int indexA, int indexB, const Accessor& a
 	return (a * (1.0f - t)) + (b * t);
 }
 
-GLTFLoader::GLTFLoader(const std::string& filename, GLTFLoader::MeshConstructionFunction meshConstructor) {
-	TinyGLTF loader;
-	Model	 model;
+GLTFLoader::GLTFLoader() {
 
-	loader.LoadASCIIFromFile(&model, nullptr, nullptr, NCL::Assets::GLTFDIR + filename);
-
-	LoadImages(model, filename);
-	LoadMaterials(model);
-	LoadSceneNodeData(model);
-
-	LoadVertexData(model, meshConstructor);
 }
 
 GLTFLoader::~GLTFLoader() {
@@ -191,6 +182,18 @@ GLTFLoader::~GLTFLoader() {
 	}
 }
 
+void GLTFLoader::Load(const std::string& filename, GLTFLoader::MeshConstructionFunction meshConstructor) {
+	TinyGLTF loader;
+	Model	 model;
+
+	loader.LoadASCIIFromFile(&model, nullptr, nullptr, NCL::Assets::GLTFDIR + filename);
+
+	LoadImages(model, filename);
+	LoadMaterials(model);
+	LoadSceneNodeData(model);
+
+	LoadVertexData(model, meshConstructor);
+}
 
 void GLTFLoader::LoadImages(tinygltf::Model& m, const std::string& rootFile) {
 	std::map<std::string, NCL::Rendering::TextureBase*> loadedTexturesMap;

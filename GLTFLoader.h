@@ -46,15 +46,15 @@ namespace NCL {
 			std::vector< GLTFMaterialLayer > allLayers;
 		};
 
-		GLTFLoader() {};
-		GLTFLoader(const std::string& filename, MeshConstructionFunction meshConstructor);
-
+		GLTFLoader();
 		~GLTFLoader();
 
 		std::vector<MeshGeometry*> outMeshes;
 		std::vector<Rendering::TextureBase*> outTextures;
 		std::vector<GLTFMaterial> outMats;
 		std::vector<MeshAnimation*> outAnims;	
+		
+		void Load(const std::string& filename, MeshConstructionFunction meshConstructor);
 		
 	protected:
 		struct GLTFSkin {
