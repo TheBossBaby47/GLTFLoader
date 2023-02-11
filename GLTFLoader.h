@@ -24,7 +24,8 @@ namespace NCL {
 
 	class GLTFLoader	{
 	public:
-		typedef std::function<NCL::MeshGeometry* (void)> MeshConstructionFunction;
+		typedef std::function<NCL::MeshGeometry* (void)>	MeshConstructionFunction;
+		typedef std::function<NCL::Rendering::TextureBase*> TextureConstructionFunction;
 
 		struct GLTFMaterialLayer {
 			Rendering::TextureBase* diffuse;
@@ -54,7 +55,7 @@ namespace NCL {
 		std::vector<GLTFMaterial> outMats;
 		std::vector<MeshAnimation*> outAnims;	
 		
-		void Load(const std::string& filename, MeshConstructionFunction meshConstructor);
+		void Load(const std::string& filename, MeshConstructionFunction meshConstructor/*, TextureConstructionFunction textureConstruction*/);
 		
 	protected:
 		struct GLTFSkin {
@@ -64,7 +65,7 @@ namespace NCL {
 			Maths::Matrix4 globalTransformInverse;
 		};
 
-		void LoadImages(tinygltf::Model& m, const std::string& rootFile);
+		void LoadImages(tinygltf::Model& m, const std::string& rootFile/*, TextureConstructionFunction texFunc*/);
 		void LoadMaterials(tinygltf::Model& m);
 		void LoadSceneNodeData(tinygltf::Model& m);
 
