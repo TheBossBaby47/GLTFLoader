@@ -182,20 +182,20 @@ GLTFLoader::~GLTFLoader() {
 	}
 }
 
-void GLTFLoader::Load(const std::string& filename, GLTFLoader::MeshConstructionFunction meshConstructor/*, TextureConstructionFunction textureConstruction*/) {
+void GLTFLoader::Load(const std::string& filename, GLTFLoader::MeshConstructionFunction meshConstructor, TextureConstructionFunction textureConstruction) {
 	TinyGLTF loader;
 	Model	 model;
 
 	loader.LoadASCIIFromFile(&model, nullptr, nullptr, NCL::Assets::GLTFDIR + filename);
 
-	LoadImages(model, filename/*, textureConstruction*/);
+	LoadImages(model, filename, textureConstruction);
 	LoadMaterials(model);
 	LoadSceneNodeData(model);
 
 	LoadVertexData(model, meshConstructor);
 }
 
-void GLTFLoader::LoadImages(tinygltf::Model& m, const std::string& rootFile/*, TextureConstructionFunction texFunc*/) {
+void GLTFLoader::LoadImages(tinygltf::Model& m, const std::string& rootFile, TextureConstructionFunction texFunc) {
 	std::map<std::string, NCL::Rendering::TextureBase*> loadedTexturesMap;
 
 	std::filesystem::path p			= rootFile;
@@ -205,7 +205,8 @@ void GLTFLoader::LoadImages(tinygltf::Model& m, const std::string& rootFile/*, T
 		std::filesystem::path imagePath = std::filesystem::path(NCL::Assets::GLTFDIR);
 		imagePath += std::filesystem::path(p.parent_path());
 		imagePath.append(i.uri);
-		TextureBase* tex = TextureLoader::LoadAPITexture(imagePath.string());
+		std::string pathString = imagePath.string();
+		TextureBase* tex = (TextureBase*)texFunc(pathString);
 		outTextures.push_back(tex);
 		loadedTexturesMap.insert({ i.uri,tex });
 	}
