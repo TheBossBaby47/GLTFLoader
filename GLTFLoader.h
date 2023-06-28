@@ -3,6 +3,8 @@
 #include <map>
 #include <string>
 #include <functional>
+#include <iostream>
+
 #include "../NCLCoreClasses/Assets.h"
 #include "../NCLCoreClasses/Matrix4.h"
 
@@ -11,11 +13,11 @@ namespace tinygltf {
 }
 
 namespace NCL {
-	class MeshGeometry;
+	class Mesh;
 	class MeshAnimation;
 
 	namespace Rendering {
-		class TextureBase;
+		class Texture;
 	}
 
 	namespace Assets {
@@ -24,15 +26,15 @@ namespace NCL {
 
 	class GLTFLoader	{
 	public:
-		typedef std::function<NCL::MeshGeometry* (void)>					MeshConstructionFunction;
-		typedef std::function<NCL::Rendering::TextureBase* (std::string&)>	TextureConstructionFunction;
+		typedef std::function<NCL::Mesh* (void)>					MeshConstructionFunction;
+		typedef std::function<NCL::Rendering::Texture* (std::string&)>	TextureConstructionFunction;
 
 		struct GLTFMaterialLayer {
-			Rendering::TextureBase* diffuse;
-			Rendering::TextureBase* bump;
-			Rendering::TextureBase* occlusion;
-			Rendering::TextureBase* emission;
-			Rendering::TextureBase* metallic;
+			Rendering::Texture* diffuse;
+			Rendering::Texture* bump;
+			Rendering::Texture* occlusion;
+			Rendering::Texture* emission;
+			Rendering::Texture* metallic;
 
 			GLTFMaterialLayer() {
 				diffuse		= nullptr;
@@ -47,22 +49,22 @@ namespace NCL {
 			std::vector< GLTFMaterialLayer > allLayers;
 		};
 
-		GLTFLoader();
+		GLTFLoader(MeshConstructionFunction meshConstructor, TextureConstructionFunction textureConstruction);
 		~GLTFLoader();
 
-		std::vector<MeshGeometry*> outMeshes;
-		std::vector<Rendering::TextureBase*> outTextures;
-		std::vector<GLTFMaterial> outMats;
-		std::vector<MeshAnimation*> outAnims;	
+		std::vector<Mesh*>				outMeshes;
+		std::vector<Rendering::Texture*>	outTextures;
+		std::vector<GLTFMaterial>				outMats;
+		std::vector<MeshAnimation*>				outAnims;	
 		
-		void Load(const std::string& filename, MeshConstructionFunction meshConstructor, TextureConstructionFunction textureConstruction);
+		void Load(const std::string& filename);
 		
 	protected:
 		struct GLTFSkin {
 			std::vector<int>			nodesUsed;
 			std::vector<Maths::Matrix4>	worldBindPose;
 			std::vector<Maths::Matrix4> worldInverseBindPose;
-			Maths::Matrix4 globalTransformInverse;
+			Maths::Matrix4				globalTransformInverse;
 		};
 
 		void LoadImages(tinygltf::Model& m, const std::string& rootFile, TextureConstructionFunction texFunc);
@@ -70,13 +72,15 @@ namespace NCL {
 		void LoadSceneNodeData(tinygltf::Model& m);
 
 		void LoadVertexData(tinygltf::Model& m, GLTFLoader::MeshConstructionFunction meshConstructor);
-		void LoadSkinningData(tinygltf::Model& m, MeshGeometry* geometry);
-		void LoadAnimationData(tinygltf::Model& m, MeshGeometry* mesh, GLTFSkin& skin);
+		void LoadSkinningData(tinygltf::Model& m, Mesh* geometry);
+		void LoadAnimationData(tinygltf::Model& m, Mesh* mesh, GLTFSkin& skin);
 
-		std::map<int, int> parentChildNodeLookup;		
-		std::vector<Maths::Matrix4> localNodeMatrices;
-		std::vector<Maths::Matrix4> worldNodeMatrices;
-		
-		std::vector<GLTFMaterialLayer> fileMats;
+		std::map<int, int>				parentChildNodeLookup;		
+		std::vector<Maths::Matrix4>		localNodeMatrices;
+		std::vector<Maths::Matrix4>		worldNodeMatrices;	
+		std::vector<GLTFMaterialLayer>	fileMats;
+
+		MeshConstructionFunction	meshConstructor;
+		TextureConstructionFunction textureConstruction;
 	};
 }

@@ -14,13 +14,17 @@
 #include "../NCLCoreClasses/Vector3.h"
 #include "../NCLCoreClasses/Vector4.h"
 
+#include "../NCLCoreClasses/Vector2i.h"
+#include "../NCLCoreClasses/Vector3i.h"
+#include "../NCLCoreClasses/Vector4i.h"
+
 #include "../NCLCoreClasses/Maths.h"
 
 #include "../NCLCoreClasses/TextureLoader.h"
-#include "../NCLCoreClasses/TextureBase.h"
+#include "../NCLCoreClasses/Texture.h"
 
 #include "../NCLCoreClasses/MeshAnimation.h"
-#include "../NCLCoreClasses/MeshGeometry.h"
+#include "../NCLCoreClasses/Mesh.h"
 
 #include <filesystem>
 #include <cmath>
@@ -30,6 +34,7 @@ using namespace tinygltf;
 using namespace NCL;
 using namespace NCL::Maths;
 using namespace NCL::Rendering;
+using NCL::Rendering::Texture;
 
 const std::string GLTFAttributeTags[] = {
 	"POSITION",
@@ -166,23 +171,24 @@ vecType GetInterpolatedVector(float t, int indexA, int indexB, const Accessor& a
 	return (a * (1.0f - t)) + (b * t);
 }
 
-GLTFLoader::GLTFLoader() {
-
+GLTFLoader::GLTFLoader(GLTFLoader::MeshConstructionFunction inMeshConstructor, TextureConstructionFunction inTextureConstruction) {
+	meshConstructor		= inMeshConstructor;
+	textureConstruction = inTextureConstruction;
 }
 
 GLTFLoader::~GLTFLoader() {
-	for (MeshGeometry* m : outMeshes) {
+	for (Mesh* m : outMeshes) {
 		delete m;
 	}
 	for (MeshAnimation* m : outAnims) {
 		delete m;
 	}
-	for (NCL::Rendering::TextureBase* t : outTextures) {
+	for (NCL::Rendering::Texture* t : outTextures) {
 		delete t;
 	}
 }
 
-void GLTFLoader::Load(const std::string& filename, GLTFLoader::MeshConstructionFunction meshConstructor, TextureConstructionFunction textureConstruction) {
+void GLTFLoader::Load(const std::string& filename) {
 	TinyGLTF loader;
 	Model	 model;
 
@@ -196,7 +202,7 @@ void GLTFLoader::Load(const std::string& filename, GLTFLoader::MeshConstructionF
 }
 
 void GLTFLoader::LoadImages(tinygltf::Model& m, const std::string& rootFile, TextureConstructionFunction texFunc) {
-	std::map<std::string, NCL::Rendering::TextureBase*> loadedTexturesMap;
+	std::map<std::string, NCL::Rendering::Texture*> loadedTexturesMap;
 
 	std::filesystem::path p			= rootFile;
 	std::filesystem::path subPath	= p.parent_path();
@@ -206,7 +212,7 @@ void GLTFLoader::LoadImages(tinygltf::Model& m, const std::string& rootFile, Tex
 		imagePath += std::filesystem::path(p.parent_path());
 		imagePath.append(i.uri);
 		std::string pathString = imagePath.string();
-		TextureBase* tex = (TextureBase*)texFunc(pathString);
+		NCL::Rendering::Texture* tex = (NCL::Rendering::Texture*)texFunc(pathString);
 		outTextures.push_back(tex);
 		loadedTexturesMap.insert({ i.uri,tex });
 	}
@@ -228,7 +234,7 @@ void GLTFLoader::LoadMaterials(tinygltf::Model& m) {
 
 void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFLoader::MeshConstructionFunction meshConstructor) {
 	for (const auto& m : model.meshes) {
-		MeshGeometry* mesh = meshConstructor();
+		Mesh* mesh = meshConstructor();
 		GLTFMaterial material;
 
 		if (m.primitives.empty()) {
@@ -394,7 +400,7 @@ void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m) {
 	}
 }
 
-void GLTFLoader::LoadSkinningData(tinygltf::Model& model, MeshGeometry* mesh) {
+void GLTFLoader::LoadSkinningData(tinygltf::Model& model, Mesh* mesh) {
 	if (model.skins.empty()) {
 		return;
 	}
@@ -472,7 +478,7 @@ void GLTFLoader::LoadSkinningData(tinygltf::Model& model, MeshGeometry* mesh) {
 	LoadAnimationData(model, mesh, skinData);
 }
 
-void GLTFLoader::LoadAnimationData(tinygltf::Model& model, MeshGeometry* mesh, GLTFSkin& skinData) {
+void GLTFLoader::LoadAnimationData(tinygltf::Model& model, Mesh* mesh, GLTFSkin& skinData) {
 	size_t jointCount = mesh->GetBindPose().size();
 	vector<int> jointParents = mesh->GetJointParents();
 	
