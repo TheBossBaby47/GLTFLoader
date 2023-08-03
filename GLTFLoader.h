@@ -3,6 +3,7 @@
 #include <map>
 #include <string>
 #include <functional>
+#include <iostream>
 #include "../NCLCoreClasses/Assets.h"
 #include "../NCLCoreClasses/Matrix4.h"
 
@@ -11,11 +12,11 @@ namespace tinygltf {
 }
 
 namespace NCL {
-	class MeshGeometry;
+	class Mesh;
 	class MeshAnimation;
 
 	namespace Rendering {
-		class TextureBase;
+		class Texture;
 	}
 
 	namespace Assets {
@@ -24,15 +25,15 @@ namespace NCL {
 
 	class GLTFLoader	{
 	public:
-		typedef std::function<NCL::MeshGeometry* (void)>					MeshConstructionFunction;
-		typedef std::function<NCL::Rendering::TextureBase* (std::string&)>	TextureConstructionFunction;
+		typedef std::function<NCL::Mesh* (void)>						MeshConstructionFunction;
+		typedef std::function<NCL::Rendering::Texture* (std::string&)>	TextureConstructionFunction;
 
 		struct GLTFMaterialLayer {
-			Rendering::TextureBase* diffuse;
-			Rendering::TextureBase* bump;
-			Rendering::TextureBase* occlusion;
-			Rendering::TextureBase* emission;
-			Rendering::TextureBase* metallic;
+			Rendering::Texture* diffuse;
+			Rendering::Texture* bump;
+			Rendering::Texture* occlusion;
+			Rendering::Texture* emission;
+			Rendering::Texture* metallic;
 
 			GLTFMaterialLayer() {
 				diffuse		= nullptr;
@@ -50,8 +51,8 @@ namespace NCL {
 		GLTFLoader();
 		~GLTFLoader();
 
-		std::vector<MeshGeometry*> outMeshes;
-		std::vector<Rendering::TextureBase*> outTextures;
+		std::vector<Mesh*> outMeshes;
+		std::vector<Rendering::Texture*> outTextures;
 		std::vector<GLTFMaterial> outMats;
 		std::vector<MeshAnimation*> outAnims;	
 		
@@ -70,8 +71,8 @@ namespace NCL {
 		void LoadSceneNodeData(tinygltf::Model& m);
 
 		void LoadVertexData(tinygltf::Model& m, GLTFLoader::MeshConstructionFunction meshConstructor);
-		void LoadSkinningData(tinygltf::Model& m, MeshGeometry* geometry);
-		void LoadAnimationData(tinygltf::Model& m, MeshGeometry* mesh, GLTFSkin& skin);
+		void LoadSkinningData(tinygltf::Model& m, Mesh* geometry);
+		void LoadAnimationData(tinygltf::Model& m, Mesh* mesh, GLTFSkin& skin);
 
 		std::map<int, int> parentChildNodeLookup;		
 		std::vector<Maths::Matrix4> localNodeMatrices;
