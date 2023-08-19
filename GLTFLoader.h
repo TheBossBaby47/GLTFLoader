@@ -6,42 +6,38 @@
 #include <iostream>
 
 #include "../NCLCoreClasses/Assets.h"
+#include "../NCLCoreClasses/Mesh.h"
+#include "../NCLCoreClasses/MeshAnimation.h"
+#include "../NCLCoreClasses/Texture.h"
 #include "../NCLCoreClasses/Matrix4.h"
 
 namespace tinygltf {
 	class Model;
 }
 
-namespace NCL {
+namespace NCL::Assets {
+	const std::string GLTFDIR(ASSETROOT + "GLTF/");
+}
+
+namespace NCL::Rendering {
 	class Mesh;
 	class MeshAnimation;
+	class Texture;
 
-	namespace Rendering {
-		class Texture;
-	}
-
-	namespace Assets {
-		const std::string GLTFDIR(ASSETROOT + "GLTF/");
-	}
 
 	class GLTFLoader	{
 	public:
-		typedef std::function<NCL::Mesh* (void)>					MeshConstructionFunction;
-		typedef std::function<NCL::Rendering::Texture* (std::string&)>	TextureConstructionFunction;
+		typedef std::function<Mesh* (void)>				MeshConstructionFunction;
+		typedef std::function<Texture* (std::string&)>	TextureConstructionFunction;
 
 		struct GLTFMaterialLayer {
-			Rendering::Texture* diffuse;
-			Rendering::Texture* bump;
-			Rendering::Texture* occlusion;
-			Rendering::Texture* emission;
-			Rendering::Texture* metallic;
+			SharedTexture diffuse;
+			SharedTexture bump;
+			SharedTexture occlusion;
+			SharedTexture emission;
+			SharedTexture metallic;
 
 			GLTFMaterialLayer() {
-				diffuse		= nullptr;
-				bump		= nullptr;
-				occlusion	= nullptr;
-				emission	= nullptr;
-				metallic	= nullptr;
 			}
 		};
 
@@ -52,10 +48,10 @@ namespace NCL {
 		GLTFLoader(MeshConstructionFunction meshConstructor, TextureConstructionFunction textureConstruction);
 		~GLTFLoader();
 
-		std::vector<Mesh*>				outMeshes;
-		std::vector<Rendering::Texture*>	outTextures;
-		std::vector<GLTFMaterial>				outMats;
-		std::vector<MeshAnimation*>				outAnims;	
+		std::vector<SharedMesh>			outMeshes;
+		std::vector<SharedTexture>		outTextures;
+		std::vector<GLTFMaterial>		outMats;
+		std::vector<SharedMeshAnim>		outAnims;	
 		
 		void Load(const std::string& filename);
 		
@@ -72,8 +68,8 @@ namespace NCL {
 		void LoadSceneNodeData(tinygltf::Model& m);
 
 		void LoadVertexData(tinygltf::Model& m, GLTFLoader::MeshConstructionFunction meshConstructor);
-		void LoadSkinningData(tinygltf::Model& m, Mesh* geometry);
-		void LoadAnimationData(tinygltf::Model& m, Mesh* mesh, GLTFSkin& skin);
+		void LoadSkinningData(tinygltf::Model& m, Mesh& geometry);
+		void LoadAnimationData(tinygltf::Model& m, Mesh& mesh, GLTFSkin& skin);
 
 		std::map<int, int>				parentChildNodeLookup;		
 		std::vector<Maths::Matrix4>		localNodeMatrices;

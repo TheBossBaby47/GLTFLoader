@@ -177,15 +177,15 @@ GLTFLoader::GLTFLoader(GLTFLoader::MeshConstructionFunction inMeshConstructor, T
 }
 
 GLTFLoader::~GLTFLoader() {
-	for (Mesh* m : outMeshes) {
-		delete m;
-	}
-	for (MeshAnimation* m : outAnims) {
-		delete m;
-	}
-	for (NCL::Rendering::Texture* t : outTextures) {
-		delete t;
-	}
+	//for (Mesh* m : outMeshes) {
+	//	delete m;
+	//}
+	//for (MeshAnimation* m : outAnims) {
+	//	delete m;
+	//}
+	//for (NCL::Rendering::Texture* t : outTextures) {
+	//	delete t;
+	//}
 }
 
 void GLTFLoader::Load(const std::string& filename) {
@@ -202,7 +202,7 @@ void GLTFLoader::Load(const std::string& filename) {
 }
 
 void GLTFLoader::LoadImages(tinygltf::Model& m, const std::string& rootFile, TextureConstructionFunction texFunc) {
-	std::map<std::string, NCL::Rendering::Texture*> loadedTexturesMap;
+	std::map<std::string, NCL::Rendering::SharedTexture> loadedTexturesMap;
 
 	std::filesystem::path p			= rootFile;
 	std::filesystem::path subPath	= p.parent_path();
@@ -212,7 +212,9 @@ void GLTFLoader::LoadImages(tinygltf::Model& m, const std::string& rootFile, Tex
 		imagePath += std::filesystem::path(p.parent_path());
 		imagePath.append(i.uri);
 		std::string pathString = imagePath.string();
-		NCL::Rendering::Texture* tex = (NCL::Rendering::Texture*)texFunc(pathString);
+	
+		SharedTexture tex = SharedTexture(texFunc(pathString));
+
 		outTextures.push_back(tex);
 		loadedTexturesMap.insert({ i.uri,tex });
 	}
@@ -234,7 +236,8 @@ void GLTFLoader::LoadMaterials(tinygltf::Model& m) {
 
 void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFLoader::MeshConstructionFunction meshConstructor) {
 	for (const auto& m : model.meshes) {
-		Mesh* mesh = meshConstructor();
+		SharedMesh mesh = SharedMesh(meshConstructor());
+
 		GLTFMaterial material;
 
 		if (m.primitives.empty()) {
@@ -337,7 +340,7 @@ void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFLoader::MeshConstruc
 		outMeshes.push_back(mesh);
 		outMats.push_back(material);
 
-		LoadSkinningData(model, mesh);
+		LoadSkinningData(model, *mesh);
 	}
 }
 
@@ -400,7 +403,7 @@ void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m) {
 	}
 }
 
-void GLTFLoader::LoadSkinningData(tinygltf::Model& model, Mesh* mesh) {
+void GLTFLoader::LoadSkinningData(tinygltf::Model& model, Mesh& mesh) {
 	if (model.skins.empty()) {
 		return;
 	}
@@ -471,16 +474,16 @@ void GLTFLoader::LoadSkinningData(tinygltf::Model& model, Mesh* mesh) {
 			jointParents.push_back(skinParent);
 		}
 	}
-	mesh->SetJointNames(jointNames);
-	mesh->SetJointParents(jointParents);
-	mesh->SetBindPose(skinData.worldBindPose);
-	mesh->SetInverseBindPose(skinData.worldInverseBindPose);
+	mesh.SetJointNames(jointNames);
+	mesh.SetJointParents(jointParents);
+	mesh.SetBindPose(skinData.worldBindPose);
+	mesh.SetInverseBindPose(skinData.worldInverseBindPose);
 	LoadAnimationData(model, mesh, skinData);
 }
 
-void GLTFLoader::LoadAnimationData(tinygltf::Model& model, Mesh* mesh, GLTFSkin& skinData) {
-	size_t jointCount = mesh->GetBindPose().size();
-	vector<int> jointParents = mesh->GetJointParents();
+void GLTFLoader::LoadAnimationData(tinygltf::Model& model, Mesh& mesh, GLTFSkin& skinData) {
+	size_t jointCount = mesh.GetBindPose().size();
+	vector<int> jointParents = mesh.GetJointParents();
 	
 	for (const auto& anim : model.animations) {
 		float animLength = 0.0f;
@@ -575,6 +578,6 @@ void GLTFLoader::LoadAnimationData(tinygltf::Model& model, Mesh* mesh, GLTFSkin&
 			allMatrices[i] = skinData.globalTransformInverse * allMatrices[i];
 		}
 
-		outAnims.push_back(new MeshAnimation((unsigned int)jointCount, frameCount, frameRate, allMatrices));
+		outAnims.push_back(std::make_unique<MeshAnimation>((unsigned int)jointCount, frameCount, frameRate, allMatrices));
 	}
 }
