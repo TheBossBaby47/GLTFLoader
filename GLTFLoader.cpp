@@ -98,7 +98,7 @@ void	ReadData(const Accessor& accessor, const Model& model, void* d, int firstEl
 }
 
 template <class vecType, class elemType>
-void CopyVectorData(vector<vecType>& vec, size_t destStart, const Accessor& accessor, const Model& model) {
+void CopyVectorData(std::vector<vecType>& vec, size_t destStart, const Accessor& accessor, const Model& model) {
 	ReadData<elemType>(accessor, model, &vec[destStart]);
 }
 
@@ -171,10 +171,14 @@ vecType GetInterpolatedVector(float t, int indexA, int indexB, const Accessor& a
 	return (a * (1.0f - t)) + (b * t);
 }
 
-GLTFLoader::GLTFLoader(GLTFLoader::MeshConstructionFunction inMeshConstructor, TextureConstructionFunction inTextureConstruction) {
-	meshConstructor		= inMeshConstructor;
-	textureConstruction = inTextureConstruction;
+GLTFLoader::GLTFLoader() {
+
 }
+
+//GLTFLoader::GLTFLoader(GLTFLoader::MeshConstructionFunction inMeshConstructor, TextureConstructionFunction inTextureConstruction) {
+//	meshConstructor		= inMeshConstructor;
+//	textureConstruction = inTextureConstruction;
+//}
 
 GLTFLoader::~GLTFLoader() {
 	//for (Mesh* m : outMeshes) {
@@ -188,9 +192,12 @@ GLTFLoader::~GLTFLoader() {
 	//}
 }
 
-void GLTFLoader::Load(const std::string& filename) {
+void GLTFLoader::Load(const std::string& filename, GLTFLoader::MeshConstructionFunction inMeshConstructor, TextureConstructionFunction inTextureConstruction) {
 	TinyGLTF loader;
 	Model	 model;
+
+	meshConstructor = inMeshConstructor;
+	textureConstruction = inTextureConstruction;
 
 	loader.LoadASCIIFromFile(&model, nullptr, nullptr, NCL::Assets::GLTFDIR + filename);
 
@@ -245,28 +252,28 @@ void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFLoader::MeshConstruc
 		}
 		size_t totalVertexCount = 0;
 
-		bool hasAttribute[MAX_ATTRIBUTES] = { false };
+		bool hasAttribute[VertexAttribute::MAX_ATTRIBUTES] = { false };
 
 		for (const auto& p : m.primitives) {
-			for (int i = 0; i < MAX_ATTRIBUTES; ++i) {
+			for (int i = 0; i < VertexAttribute::MAX_ATTRIBUTES; ++i) {
 				hasAttribute[i] |= p.attributes.find(GLTFAttributeTags[i]) != p.attributes.end();
 			}
 
-			auto hasVerts = p.attributes.find(GLTFAttributeTags[Positions]);
+			auto hasVerts = p.attributes.find(GLTFAttributeTags[VertexAttribute::Positions]);
 
 			if (hasVerts != p.attributes.end()) {
 				totalVertexCount += model.accessors[hasVerts->second].count;
 			}
 		}
-		vector<Vector3> vPositions(totalVertexCount);
-		vector<Vector3> vNormals(hasAttribute[Normals] ? totalVertexCount : 0);
-		vector<Vector4> vTangents(hasAttribute[Tangents] ? totalVertexCount : 0);
-		vector<Vector2> vTexCoords(hasAttribute[TextureCoords] ? totalVertexCount : 0);
+		std::vector<Vector3> vPositions(totalVertexCount);
+		std::vector<Vector3> vNormals(hasAttribute[VertexAttribute::Normals] ? totalVertexCount : 0);
+		std::vector<Vector4> vTangents(hasAttribute[VertexAttribute::Tangents] ? totalVertexCount : 0);
+		std::vector<Vector2> vTexCoords(hasAttribute[VertexAttribute::TextureCoords] ? totalVertexCount : 0);
 
-		vector<Vector4>  vJointWeights(hasAttribute[JointWeights] ? totalVertexCount : 0);
-		vector<Vector4i> vJointIndices(hasAttribute[JointIndices] ? totalVertexCount : 0);
+		std::vector<Vector4>  vJointWeights(hasAttribute[VertexAttribute::JointWeights] ? totalVertexCount : 0);
+		std::vector<Vector4i> vJointIndices(hasAttribute[VertexAttribute::JointIndices] ? totalVertexCount : 0);
 
-		vector<unsigned int>		vIndices;
+		std::vector<unsigned int>		vIndices;
 
 		const Primitive& p = m.primitives[0];
 
@@ -274,37 +281,37 @@ void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFLoader::MeshConstruc
 
 		//now load up the actual vertex data
 		for (const auto& p : m.primitives) {
-			std::map<std::string, int>::const_iterator vPrims[MAX_ATTRIBUTES];
+			std::map<std::string, int>::const_iterator vPrims[VertexAttribute::MAX_ATTRIBUTES];
 
-			for (int i = 0; i < MAX_ATTRIBUTES; ++i) {
+			for (int i = 0; i < VertexAttribute::MAX_ATTRIBUTES; ++i) {
 				vPrims[i] = p.attributes.find(GLTFAttributeTags[i]);
 			}
 
 			size_t baseVertex = vArrayPos;
 			size_t firstIndex = vIndices.size();
 
-			if (vPrims[JointWeights] != p.attributes.end()) {
-				Accessor& a = model.accessors[vPrims[JointWeights]->second];
+			if (vPrims[VertexAttribute::JointWeights] != p.attributes.end()) {
+				Accessor& a = model.accessors[vPrims[VertexAttribute::JointWeights]->second];
 				CopyVectorData<Vector4, float>(vJointWeights, vArrayPos, a, model);
 			}
-			if (vPrims[JointIndices] != p.attributes.end()) {
-				Accessor& a = model.accessors[vPrims[JointIndices]->second];
+			if (vPrims[VertexAttribute::JointIndices] != p.attributes.end()) {
+				Accessor& a = model.accessors[vPrims[VertexAttribute::JointIndices]->second];
 				CopyVectorData<Vector4i, unsigned int>(vJointIndices, vArrayPos, a, model);
 			}
-			if (vPrims[Normals] != p.attributes.end()) {
-				Accessor& a = model.accessors[vPrims[Normals]->second];
+			if (vPrims[VertexAttribute::Normals] != p.attributes.end()) {
+				Accessor& a = model.accessors[vPrims[VertexAttribute::Normals]->second];
 				CopyVectorData<Vector3, float>(vNormals, vArrayPos, a, model);
 			}
-			if (vPrims[Tangents] != p.attributes.end()) {
-				Accessor& a = model.accessors[vPrims[Tangents]->second];
+			if (vPrims[VertexAttribute::Tangents] != p.attributes.end()) {
+				Accessor& a = model.accessors[vPrims[VertexAttribute::Tangents]->second];
 				CopyVectorData<Vector4, float>(vTangents, vArrayPos, a, model);
 			}
-			if (vPrims[TextureCoords] != p.attributes.end()) {
-				Accessor& a = model.accessors[vPrims[TextureCoords]->second];
+			if (vPrims[VertexAttribute::TextureCoords] != p.attributes.end()) {
+				Accessor& a = model.accessors[vPrims[VertexAttribute::TextureCoords]->second];
 				CopyVectorData<Vector2, float>(vTexCoords, vArrayPos, a, model);
 			}
-			if (vPrims[Positions] != p.attributes.end()) {
-				Accessor& a = model.accessors[vPrims[Positions]->second];
+			if (vPrims[VertexAttribute::Positions] != p.attributes.end()) {
+				Accessor& a = model.accessors[vPrims[VertexAttribute::Positions]->second];
 				size_t oldPos = vPositions.size();
 				CopyVectorData<Vector3, float>(vPositions, vArrayPos, a, model);
 				vArrayPos += a.count;
@@ -409,8 +416,8 @@ void GLTFLoader::LoadSkinningData(tinygltf::Model& model, Mesh& mesh) {
 	}
 	std::map<int, int> nodeToJointLookup;
 
-	vector<std::string> jointNames;
-	vector<int>			jointParents;
+	std::vector<std::string>	jointNames;
+	std::vector<int>			jointParents;
 
 	GLTFSkin skinData;
 
@@ -483,7 +490,7 @@ void GLTFLoader::LoadSkinningData(tinygltf::Model& model, Mesh& mesh) {
 
 void GLTFLoader::LoadAnimationData(tinygltf::Model& model, Mesh& mesh, GLTFSkin& skinData) {
 	size_t jointCount = mesh.GetBindPose().size();
-	vector<int> jointParents = mesh.GetJointParents();
+	std::vector<int> jointParents = mesh.GetJointParents();
 	
 	for (const auto& anim : model.animations) {
 		float animLength = 0.0f;
