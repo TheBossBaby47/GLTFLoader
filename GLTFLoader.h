@@ -23,8 +23,6 @@ namespace NCL::Rendering {
 	class MeshAnimation;
 	class Texture;
 
-
-
 	class GLTFLoader	{
 	public:
 		typedef std::function<NCL::Rendering::Mesh* (void)>				MeshConstructionFunction;

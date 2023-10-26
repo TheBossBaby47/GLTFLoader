@@ -175,21 +175,8 @@ GLTFLoader::GLTFLoader() {
 
 }
 
-//GLTFLoader::GLTFLoader(GLTFLoader::MeshConstructionFunction inMeshConstructor, TextureConstructionFunction inTextureConstruction) {
-//	meshConstructor		= inMeshConstructor;
-//	textureConstruction = inTextureConstruction;
-//}
-
 GLTFLoader::~GLTFLoader() {
-	//for (Mesh* m : outMeshes) {
-	//	delete m;
-	//}
-	//for (MeshAnimation* m : outAnims) {
-	//	delete m;
-	//}
-	//for (NCL::Rendering::Texture* t : outTextures) {
-	//	delete t;
-	//}
+
 }
 
 void GLTFLoader::Load(const std::string& filename, GLTFLoader::MeshConstructionFunction inMeshConstructor, TextureConstructionFunction inTextureConstruction) {
