@@ -171,31 +171,24 @@ vecType GetInterpolatedVector(float t, int indexA, int indexB, const Accessor& a
 	return (a * (1.0f - t)) + (b * t);
 }
 
-GLTFLoader::GLTFLoader() {
-
-}
-
-GLTFLoader::~GLTFLoader() {
-
-}
-
-void GLTFLoader::Load(const std::string& filename, GLTFLoader::MeshConstructionFunction inMeshConstructor, TextureConstructionFunction inTextureConstruction) {
-	TinyGLTF loader;
+bool GLTFLoader::Load(const std::string& filename, GLTFScene& intoScene, GLTFLoader::MeshConstructionFunction inMeshConstructor, TextureConstructionFunction inTextureConstruction) {
+	TinyGLTF gltf;
 	Model	 model;
 
-	meshConstructor = inMeshConstructor;
-	textureConstruction = inTextureConstruction;
+	if (!gltf.LoadASCIIFromFile(&model, nullptr, nullptr, NCL::Assets::GLTFDIR + filename)) {
+		return false;
+	}
 
-	loader.LoadASCIIFromFile(&model, nullptr, nullptr, NCL::Assets::GLTFDIR + filename);
+	LoadImages(model, intoScene, filename, inTextureConstruction);
+	LoadMaterials(model, intoScene);
+	LoadSceneNodeData(model, intoScene);
 
-	LoadImages(model, filename, textureConstruction);
-	LoadMaterials(model);
-	LoadSceneNodeData(model);
+	LoadVertexData(model, intoScene, inMeshConstructor);
 
-	LoadVertexData(model, meshConstructor);
+	return true;
 }
 
-void GLTFLoader::LoadImages(tinygltf::Model& m, const std::string& rootFile, TextureConstructionFunction texFunc) {
+void GLTFLoader::LoadImages(tinygltf::Model& m, GLTFScene& scene, const std::string& rootFile, TextureConstructionFunction texFunc) {
 	std::map<std::string, NCL::Rendering::SharedTexture> loadedTexturesMap;
 
 	std::filesystem::path p			= rootFile;
@@ -209,26 +202,27 @@ void GLTFLoader::LoadImages(tinygltf::Model& m, const std::string& rootFile, Tex
 	
 		SharedTexture tex = SharedTexture(texFunc(pathString));
 
-		outTextures.push_back(tex);
+		scene.textures.push_back(tex);
 		loadedTexturesMap.insert({ i.uri,tex });
 	}
 }
 
-void GLTFLoader::LoadMaterials(tinygltf::Model& m) {
+void GLTFLoader::LoadMaterials(tinygltf::Model& m, GLTFScene& scene) {
+	scene.materialLayers.reserve(m.materials.size());
 	for (const auto& m : m.materials) {
 		GLTFMaterialLayer layer;
-		layer.diffuse	= m.pbrMetallicRoughness.baseColorTexture.index			>= 0 ? outTextures[m.pbrMetallicRoughness.baseColorTexture.index]		  : nullptr;	
-		layer.metallic	= m.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0 ? outTextures[m.pbrMetallicRoughness.metallicRoughnessTexture.index] : nullptr;
+		layer.albedo	= m.pbrMetallicRoughness.baseColorTexture.index			>= 0 ? scene.textures[m.pbrMetallicRoughness.baseColorTexture.index]		  : nullptr;
+		layer.metallic	= m.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0 ? scene.textures[m.pbrMetallicRoughness.metallicRoughnessTexture.index] : nullptr;
 			
-		layer.bump		= m.normalTexture.index		>= 0 ? outTextures[m.normalTexture.index]	 : nullptr;
-		layer.occlusion = m.occlusionTexture.index	>= 0 ? outTextures[m.occlusionTexture.index] : nullptr;
-		layer.emission	= m.emissiveTexture.index	>= 0 ? outTextures[m.emissiveTexture.index]  : nullptr;
+		layer.bump		= m.normalTexture.index		>= 0 ? scene.textures[m.normalTexture.index]	 : nullptr;
+		layer.occlusion = m.occlusionTexture.index	>= 0 ? scene.textures[m.occlusionTexture.index] : nullptr;
+		layer.emission	= m.emissiveTexture.index	>= 0 ? scene.textures[m.emissiveTexture.index]  : nullptr;
 		
-		fileMats.push_back(layer);
+		scene.materialLayers.push_back(layer);
 	}
 }
 
-void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFLoader::MeshConstructionFunction meshConstructor) {
+void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFScene& scene, GLTFLoader::MeshConstructionFunction meshConstructor) {
 	for (const auto& m : model.meshes) {
 		SharedMesh mesh = SharedMesh(meshConstructor());
 
@@ -316,7 +310,7 @@ void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFLoader::MeshConstruc
 			GLTFMaterialLayer matLayer;
 
 			if (p.material >= 0) { //fcan ever be false?
-				matLayer = fileMats[p.material];
+				matLayer = scene.materialLayers[p.material];
 			}
 			material.allLayers.push_back(matLayer);
 
@@ -331,22 +325,28 @@ void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFLoader::MeshConstruc
 		mesh->SetVertexSkinIndices(vJointIndices);
 		mesh->SetVertexSkinWeights(vJointWeights);
 
-		outMeshes.push_back(mesh);
-		outMats.push_back(material);
+		scene.meshes.push_back(mesh);
+		scene.materials.push_back(material);
 
-		LoadSkinningData(model, *mesh);
+		LoadSkinningData(model, scene, *mesh);
 	}
 }
 
-void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m) {
+void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m, GLTFScene& scene) {
+	scene.sceneNodes.resize(m.nodes.size());
+
 	for (int i = 0; i < m.nodes.size(); ++i) {
-		auto& node = m.nodes[i];
+		auto& sceneNode = scene.sceneNodes[i];
+		auto& fileNode = m.nodes[i];
+
+		sceneNode.name = fileNode.name;
+		sceneNode.nodeID = i;
 
 		Matrix4 mat;
-		if (!node.matrix.empty()) { //node can be defined with a matrix - never targeted by animations!
+		if (!fileNode.matrix.empty()) { //node can be defined with a matrix - never targeted by animations!
 			float* data = (float*)(&(mat.array));
-			for (int j = 0; j < node.matrix.size(); ++j) {
-				*data = (float)node.matrix[j];
+			for (int j = 0; j < fileNode.matrix.size(); ++j) {
+				*data = (float)fileNode.matrix[j];
 				++data;
 			}
 		}
@@ -355,130 +355,128 @@ void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m) {
 			Matrix4 translation;
 			Matrix4 scale;
 
-			if (!node.scale.empty()) {
-				Vector3 s = { (float)node.scale[0], (float)node.scale[1], (float)node.scale[2] };
+			if (!fileNode.scale.empty()) {
+				Vector3 s = { (float)fileNode.scale[0], (float)fileNode.scale[1], (float)fileNode.scale[2] };
 				scale = Matrix4::Scale(s);
 			}
-			if (!node.translation.empty()) {
-				Vector3 t = { (float)node.translation[0], (float)node.translation[1], (float)node.translation[2] };
+			if (!fileNode.translation.empty()) {
+				Vector3 t = { (float)fileNode.translation[0], (float)fileNode.translation[1], (float)fileNode.translation[2] };
 				translation = Matrix4::Translation(t);
 			}
-			if (!node.rotation.empty()) {
-				rotation = Quaternion(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]).Normalised();
+			if (!fileNode.rotation.empty()) {
+				rotation = Quaternion(fileNode.rotation[0], fileNode.rotation[1], fileNode.rotation[2], fileNode.rotation[3]).Normalised();
 			}
 			mat = translation * rotation * scale;
 		}
-		localNodeMatrices.push_back(mat);
+		sceneNode.localMatrix = mat;
+		sceneNode.worldMatrix = mat; //will be sorted out later!
 
-		for (auto& j : node.children) {
-			parentChildNodeLookup.insert({ j,i });
+		sceneNode.children.resize(fileNode.children.size());
+
+		for (int j = 0; j < fileNode.children.size(); ++j) {
+			sceneNode.children[j] = &(scene.sceneNodes[fileNode.children[j]]);
+			sceneNode.children[j]->parent = &sceneNode;
 		}
 	}
 	//There's seemingly no guarantee that a child node comes after its parent...(RiggedSimple demonstrates this)
 	//So instead we need to traverse any top-level nodes and build up the world matrices from there
-	worldNodeMatrices = localNodeMatrices;
-
-	std::stack<int> nodesToVisit;
-
-	for (int i = 0; i < m.nodes.size(); ++i) {
-		const auto& p = parentChildNodeLookup.find(i);
-		if (p == parentChildNodeLookup.end()) { //a top level node!
-			nodesToVisit.push(i);
+	std::stack<GLTFNode*> nodesToVisit;
+	for (int i = 0; i < scene.sceneNodes.size(); ++i) {
+		if (scene.sceneNodes[i].parent == nullptr) {
+			nodesToVisit.push(&scene.sceneNodes[i]);	//a top level node!
 		}
 	}
 	while (!nodesToVisit.empty()) {
-		int node = nodesToVisit.top();
+		auto& sceneNode =	nodesToVisit.top();
 		nodesToVisit.pop();
-		for (int i = 0; i < m.nodes[node].children.size(); ++i) {
-			int cNode = m.nodes[node].children[i];
-			worldNodeMatrices[cNode] = worldNodeMatrices[node] * worldNodeMatrices[cNode];
+		for (int i = 0; i < sceneNode->children.size(); ++i) {
+			auto cNode = sceneNode->children[i];
+			cNode->worldMatrix = sceneNode->worldMatrix * cNode->localMatrix;
 			nodesToVisit.push(cNode);
 		}
 	}
 }
 
-void GLTFLoader::LoadSkinningData(tinygltf::Model& model, Mesh& mesh) {
+void GLTFLoader::LoadSkinningData(tinygltf::Model& model, GLTFScene& scene, Mesh& mesh) {
 	if (model.skins.empty()) {
 		return;
 	}
-	std::map<int, int> nodeToJointLookup;
+	int skinID = 0;
+	for (auto& skin : model.skins) {
+		GLTFSkin skinData;
 
-	std::vector<std::string>	jointNames;
-	std::vector<int>			jointParents;
-
-	GLTFSkin skinData;
-
-	int meshSkinID = 0; //TODO
-
-	auto& skin = model.skins[meshSkinID];
-
-	int rootIndex = 0;
-	for (int i = 0; i < model.nodes.size(); ++i) {
-		if (model.nodes[i].skin == meshSkinID) {
-			rootIndex = i;
-			break;
+		int rootIndex = 0; //TODO: Is it guaranteed that the first node is the root...
+		for (int i = 0; i < model.nodes.size(); ++i) {
+			if (model.nodes[i].skin == skinID) {
+				rootIndex = i;
+				break;
+			}
 		}
-	}
-	skinData.globalTransformInverse = worldNodeMatrices[rootIndex].Inverse();
+		skinData.globalTransformInverse = scene.sceneNodes[rootIndex].worldMatrix.Inverse();
 
-	size_t jointCount = skin.joints.size();
+		skinData.worldInverseBindPose.resize(skin.joints.size());
 
-	skinData.worldInverseBindPose.resize(jointCount);
+		int index = skin.inverseBindMatrices;
+		if (index >= 0) {
+			Accessor& a = model.accessors[index];
 
-	int index = model.skins[0].inverseBindMatrices;
-	if (index >= 0) {
-		Accessor& a = model.accessors[index];
+			const auto& inBufferView = model.bufferViews[a.bufferView];
+			const auto& inBuffer = model.buffers[inBufferView.buffer];
 
-		const auto& inBufferView = model.bufferViews[a.bufferView];
-		const auto& inBuffer = model.buffers[inBufferView.buffer];
+			const unsigned char* inData = inBuffer.data.data() + inBufferView.byteOffset + a.byteOffset;
+			Matrix4* matData = (Matrix4*)inData;
 
-		const unsigned char* inData = inBuffer.data.data() + inBufferView.byteOffset + a.byteOffset;
-		Matrix4* test = (Matrix4*)inData;
+			size_t count = inBufferView.byteLength / sizeof(Matrix4);
 
-		size_t count = inBufferView.byteLength / sizeof(Matrix4);
-
-		for (int i = 0; i < count; ++i) {
-			skinData.worldInverseBindPose[i] = *test;
-			test++;
-		}
-	}
-	else {
-		//???
-	}
-
-	for (int i = 0; i < skin.joints.size(); ++i) {
-		nodeToJointLookup.insert({ skin.joints[i], i });
-	}
-
-	for (int i = 0; i < skin.joints.size(); ++i) {
-		auto& node = model.nodes[skin.joints[i]];
-		jointNames.push_back(node.name);
-		skinData.worldBindPose.push_back(worldNodeMatrices[skin.joints[i]]);
-	}
-
-	for (int i = 0; i < skin.joints.size(); ++i) {
-		skinData.nodesUsed.push_back(skin.joints[i]);
-		const auto& parent = parentChildNodeLookup.find(skin.joints[i]);
-		if (parent == parentChildNodeLookup.end()) {
-			jointParents.push_back(-1);
+			for (int i = 0; i < count; ++i) {
+				skinData.worldInverseBindPose[i] = *matData;
+				matData++;
+			}
 		}
 		else {
-			//now we need to go back the other way!
-			int skinParent = nodeToJointLookup[parent->second];
-			jointParents.push_back(skinParent);
+			//???
 		}
+
+		//Build the correct list for the parent lookup later
+		for (int i = 0; i < skin.joints.size(); ++i) {
+			auto& node = model.nodes[skin.joints[i]];
+			skinData.localJointNames.push_back(node.name);
+			skinData.sceneToLocalLookup.insert({ skin.joints[i], i });
+			skinData.localToSceneLookup.insert({i, skin.joints[i] });
+			skinData.worldBindPose.push_back(scene.sceneNodes[skin.joints[i]].worldMatrix);
+		}
+
+		std::vector<int>	localParentList;
+
+		for (int i = 0; i < skin.joints.size(); ++i) {
+			GLTFNode& node = scene.sceneNodes[skin.joints[i]];
+
+			if (node.parent == nullptr) {
+				localParentList.push_back(-1);
+			}
+			else {
+				auto result = skinData.sceneToLocalLookup.find(node.parent->nodeID);
+				if (result == skinData.sceneToLocalLookup.end()) {
+					localParentList.push_back(-1);
+				}
+				else {
+					localParentList.push_back(result->second);
+				}
+			}
+		}
+		mesh.SetJointNames(skinData.localJointNames);
+		mesh.SetJointParents(localParentList);
+		mesh.SetBindPose(skinData.worldBindPose);
+		mesh.SetInverseBindPose(skinData.worldInverseBindPose);
+		LoadAnimationData(model, scene, mesh, skinData);
+		skinID++;
 	}
-	mesh.SetJointNames(jointNames);
-	mesh.SetJointParents(jointParents);
-	mesh.SetBindPose(skinData.worldBindPose);
-	mesh.SetInverseBindPose(skinData.worldInverseBindPose);
-	LoadAnimationData(model, mesh, skinData);
 }
 
-void GLTFLoader::LoadAnimationData(tinygltf::Model& model, Mesh& mesh, GLTFSkin& skinData) {
+void GLTFLoader::LoadAnimationData(tinygltf::Model& model, GLTFScene& scene, Mesh& mesh, GLTFSkin& skinData) {
 	size_t jointCount = mesh.GetBindPose().size();
 	std::vector<int> jointParents = mesh.GetJointParents();
-	
+
 	for (const auto& anim : model.animations) {
 		float animLength = 0.0f;
 		for (int i = 0; i < anim.samplers.size(); ++i) {
@@ -489,21 +487,23 @@ void GLTFLoader::LoadAnimationData(tinygltf::Model& model, Mesh& mesh, GLTFSkin&
 		float frameRate = 1.0f / 30.0f;
 		unsigned int frameCount = 0;
 
-		std::vector<Matrix4> allMatrices;
+		std::vector<Matrix4> localMatrices;
+		localMatrices.reserve(jointCount * (animLength / frameRate));
 
-		size_t matrixStart = 0;
+		std::vector<int> inAnim(jointCount, 0); //TODO: reduce to only nodes that matter
+
+		static int TRANSLATION_BIT	= 1;
+		static int ROTATION_BIT		= 2;
+		static int SCALE_BIT		= 4;
+
 		while (time <= animLength) {
-			allMatrices.resize(allMatrices.size() + jointCount);
+			localMatrices.reserve((frameCount+1) * jointCount);
 
 			std::map<int, Vector3> frameJointTranslations;
 			std::map<int, Vector3> frameJointScales;
 			std::map<int, Quaternion> frameJointRotations;
 
-			std::vector<int> inAnim(model.nodes.size(), 0);
-
-			static int TRANSLATION_BIT	= 1;
-			static int ROTATION_BIT		= 2;
-			static int SCALE_BIT		= 4;
+			std::fill(inAnim.begin(), inAnim.end(), 0);
 
 			for (const auto& channel : anim.channels) {
 				const auto& sampler = anim.samplers[channel.sampler];
@@ -513,65 +513,75 @@ void GLTFLoader::LoadAnimationData(tinygltf::Model& model, Mesh& mesh, GLTFSkin&
 				int indexA	= 0;
 				int indexB	= 0;
 				float t		= 0.0f;
-
-				int nodeID = channel.target_node; //seems correct!
 				GetInterpolationData(time, indexA, indexB, t, input, model);
 
+				int localNodeID = skinData.sceneToLocalLookup[channel.target_node];
+
 				if (channel.target_path == "translation") {
-					frameJointTranslations.insert({ nodeID, GetInterpolatedVector<Vector3>(t, indexA, indexB, output, model) });
-					inAnim[nodeID] |= TRANSLATION_BIT;
+					frameJointTranslations.insert({ localNodeID, GetInterpolatedVector<Vector3>(t, indexA, indexB, output, model) });
+					inAnim[localNodeID] |= TRANSLATION_BIT;
 				}
 				else if (channel.target_path == "rotation") {
 					Quaternion q = GetSlerpQuaterion(t, indexA, indexB, output, model);
-					frameJointRotations.insert({ nodeID, q });
-					inAnim[nodeID] |= ROTATION_BIT;
+					frameJointRotations.insert({ localNodeID, q });
+					inAnim[localNodeID] |= ROTATION_BIT;
 				}
 				else if (channel.target_path == "scale") {
-					frameJointScales.insert({ nodeID, GetInterpolatedVector<Vector3>(t, indexA, indexB, output, model) });
-					inAnim[nodeID] |= SCALE_BIT;
+					frameJointScales.insert({ localNodeID, GetInterpolatedVector<Vector3>(t, indexA, indexB, output, model) });
+					inAnim[localNodeID] |= SCALE_BIT;
 				}
 			}
 
-			for (int i = 0; i < skinData.nodesUsed.size(); ++i) {
-				int nodeID = skinData.nodesUsed[i];
+			int startMatrix = localMatrices.size();
 
-				int in = inAnim[nodeID];
-				Matrix4 transform;
-				if (in > 0) {
+			//We'll assume that nodes aren't animated by default
+			for (int i = 0; i < mesh.GetJointCount(); ++i) {
+				int localNodeID = i;
+				int sceneNodeID = skinData.localToSceneLookup[localNodeID];
+				GLTFNode& node = scene.sceneNodes[sceneNodeID];
+				localMatrices.push_back(node.worldMatrix);
+			}
+
+			for (int i = 0; i < mesh.GetJointCount(); ++i) {
+				int localNodeID = i;
+				int in = inAnim[localNodeID];
+
+				if (in > 0) { //This node has a modifier of some sort
+					int sceneNodeID = skinData.localToSceneLookup[localNodeID];
+
+					GLTFNode& node = scene.sceneNodes[sceneNodeID];
+
 					Vector3 translation;
 					Vector3 scale(1, 1, 1);
 					Quaternion rotation;
 
 					if (in & TRANSLATION_BIT) {
-						translation = frameJointTranslations[nodeID];
+						translation = frameJointTranslations[localNodeID];
 					}
 					if (in & ROTATION_BIT) {
-						rotation = frameJointRotations[nodeID];
+						rotation = frameJointRotations[localNodeID];
 					}
 					if (in & SCALE_BIT) {
-						scale = frameJointScales[nodeID];
+						scale = frameJointScales[localNodeID];
 					}
-					transform = Matrix4::Translation(translation) * Matrix4(rotation) * Matrix4::Scale(scale);
+					Matrix4 transform = Matrix4::Translation(translation) * Matrix4(rotation) * Matrix4::Scale(scale);
 
-					int p = jointParents[i];
-					if (p >= 0) {//It's a local transform!
-						transform = allMatrices[matrixStart + p] * transform;
+					if (node.parent) {//It's a local transform!
+						//We need to work out this frame's matrix for the parent node - may have been animated
+						int localParentID = skinData.sceneToLocalLookup[node.parent->nodeID];
+						transform = localMatrices[startMatrix + localParentID] * transform;
 					}
+					localMatrices[startMatrix + i] = transform;
 				}
-				else {
-					transform = worldNodeMatrices[nodeID];
-				}
-				allMatrices[matrixStart + i] = transform;
 			}
 			time += frameRate;
 			frameCount++;
-			matrixStart += jointCount;
 		}
 
-		for (int i = 0; i < allMatrices.size(); ++i) {
-			allMatrices[i] = skinData.globalTransformInverse * allMatrices[i];
+		for (int i = 0; i < localMatrices.size(); ++i) {
+			localMatrices[i] = skinData.globalTransformInverse * localMatrices[i];
 		}
 
-		outAnims.push_back(std::make_unique<MeshAnimation>((unsigned int)jointCount, frameCount, frameRate, allMatrices));
+		scene.animations.push_back(std::make_unique<MeshAnimation>((unsigned int)jointCount, frameCount, frameRate, localMatrices));
 	}
 }
