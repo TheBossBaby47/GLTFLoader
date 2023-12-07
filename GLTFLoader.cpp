@@ -10,14 +10,6 @@
 
 #include "../NCLCoreClasses/Quaternion.h"
 
-#include "../NCLCoreClasses/Vector2.h"
-#include "../NCLCoreClasses/Vector3.h"
-#include "../NCLCoreClasses/Vector4.h"
-
-#include "../NCLCoreClasses/Vector2i.h"
-#include "../NCLCoreClasses/Vector3i.h"
-#include "../NCLCoreClasses/Vector4i.h"
-
 #include "../NCLCoreClasses/Maths.h"
 
 #include "../NCLCoreClasses/TextureLoader.h"
@@ -357,14 +349,16 @@ void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m, GLTFScene& scene) {
 
 			if (!fileNode.scale.empty()) {
 				Vector3 s = { (float)fileNode.scale[0], (float)fileNode.scale[1], (float)fileNode.scale[2] };
-				scale = Matrix4::Scale(s);
+				scale = Matrix::Scale(s);
 			}
 			if (!fileNode.translation.empty()) {
 				Vector3 t = { (float)fileNode.translation[0], (float)fileNode.translation[1], (float)fileNode.translation[2] };
-				translation = Matrix4::Translation(t);
+				translation = Matrix::Translation(t);
 			}
 			if (!fileNode.rotation.empty()) {
-				rotation = Quaternion(fileNode.rotation[0], fileNode.rotation[1], fileNode.rotation[2], fileNode.rotation[3]).Normalised();
+				Quaternion q(fileNode.rotation[0], fileNode.rotation[1], fileNode.rotation[2], fileNode.rotation[3]);
+				q.Normalise();
+				rotation = Maths::RotationMatrixFromQuaternion<Matrix4>(q);
 			}
 			mat = translation * rotation * scale;
 		}
@@ -412,7 +406,7 @@ void GLTFLoader::LoadSkinningData(tinygltf::Model& model, GLTFScene& scene, Mesh
 				break;
 			}
 		}
-		skinData.globalTransformInverse = scene.sceneNodes[rootIndex].worldMatrix.Inverse();
+		skinData.globalTransformInverse = Matrix::Inverse(scene.sceneNodes[rootIndex].worldMatrix);
 
 		skinData.worldInverseBindPose.resize(skin.joints.size());
 
@@ -564,7 +558,9 @@ void GLTFLoader::LoadAnimationData(tinygltf::Model& model, GLTFScene& scene, Mes
 					if (in & SCALE_BIT) {
 						scale = frameJointScales[localNodeID];
 					}
-					Matrix4 transform = Matrix4::Translation(translation) * Matrix4(rotation) * Matrix4::Scale(scale);
+					Matrix4 transform = Matrix::Translation(translation) *
+						Maths::RotationMatrixFromQuaternion<Matrix4>(rotation) *
+						Matrix::Scale(scale);
 
 					if (node.parent) {//It's a local transform!
 						//We need to work out this frame's matrix for the parent node - may have been animated
