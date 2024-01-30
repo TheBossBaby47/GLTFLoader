@@ -9,7 +9,7 @@
 #include "../NCLCoreClasses/Mesh.h"
 #include "../NCLCoreClasses/MeshAnimation.h"
 #include "../NCLCoreClasses/Texture.h"
-#include "../NCLCoreClasses/Matrix4.h"
+#include "../NCLCoreClasses/Matrix.h"
 
 namespace tinygltf {
 	class Model;
