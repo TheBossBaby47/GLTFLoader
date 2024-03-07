@@ -363,7 +363,7 @@ void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m, GLTFScene& scene, BaseSta
 			if (!fileNode.rotation.empty()) {
 				Quaternion q(fileNode.rotation[0], fileNode.rotation[1], fileNode.rotation[2], fileNode.rotation[3]);
 				q.Normalise();
-				rotation = Maths::RotationMatrixFromQuaternion<Matrix4>(q);
+				rotation = Quaternion::RotationMatrix<Matrix4>(q);
 			}
 			mat = translation * rotation * scale;
 		}
