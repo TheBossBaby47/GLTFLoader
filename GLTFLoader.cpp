@@ -171,16 +171,24 @@ bool GLTFLoader::Load(const std::string& filename, GLTFScene& intoScene, GLTFLoa
 		return false;
 	}
 
-	LoadImages(model, intoScene, filename, inTextureConstruction);
-	LoadMaterials(model, intoScene);
-	LoadSceneNodeData(model, intoScene);
+	BaseState state;
+	state.firstAnim		= intoScene.animations.size();
+	state.firstMat		= intoScene.materials.size();
+	state.firstMatLayer = intoScene.materialLayers.size();
+	state.firstMesh		= intoScene.meshes.size();
+	state.firstNode		= intoScene.sceneNodes.size();
+	state.firstTex		= intoScene.textures.size();
 
-	LoadVertexData(model, intoScene, inMeshConstructor);
+	LoadImages(model, intoScene, state, filename, inTextureConstruction);
+	LoadMaterials(model, intoScene, state);
+	LoadSceneNodeData(model, intoScene, state);
+
+	LoadVertexData(model, intoScene, state, inMeshConstructor);
 
 	return true;
 }
 
-void GLTFLoader::LoadImages(tinygltf::Model& m, GLTFScene& scene, const std::string& rootFile, TextureConstructionFunction texFunc) {
+void GLTFLoader::LoadImages(tinygltf::Model& m, GLTFScene& scene, BaseState state, const std::string& rootFile, TextureConstructionFunction texFunc) {
 	std::map<std::string, NCL::Rendering::SharedTexture> loadedTexturesMap;
 
 	std::filesystem::path p			= rootFile;
@@ -199,22 +207,22 @@ void GLTFLoader::LoadImages(tinygltf::Model& m, GLTFScene& scene, const std::str
 	}
 }
 
-void GLTFLoader::LoadMaterials(tinygltf::Model& m, GLTFScene& scene) {
+void GLTFLoader::LoadMaterials(tinygltf::Model& m, GLTFScene& scene, BaseState state) {
 	scene.materialLayers.reserve(m.materials.size());
 	for (const auto& m : m.materials) {
 		GLTFMaterialLayer layer;
-		layer.albedo	= m.pbrMetallicRoughness.baseColorTexture.index			>= 0 ? scene.textures[m.pbrMetallicRoughness.baseColorTexture.index]		  : nullptr;
-		layer.metallic	= m.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0 ? scene.textures[m.pbrMetallicRoughness.metallicRoughnessTexture.index] : nullptr;
+		layer.albedo	= m.pbrMetallicRoughness.baseColorTexture.index			>= 0 ? scene.textures[state.firstTex + m.pbrMetallicRoughness.baseColorTexture.index]		  : nullptr;
+		layer.metallic	= m.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0 ? scene.textures[state.firstTex + m.pbrMetallicRoughness.metallicRoughnessTexture.index] : nullptr;
 			
-		layer.bump		= m.normalTexture.index		>= 0 ? scene.textures[m.normalTexture.index]	 : nullptr;
-		layer.occlusion = m.occlusionTexture.index	>= 0 ? scene.textures[m.occlusionTexture.index] : nullptr;
-		layer.emission	= m.emissiveTexture.index	>= 0 ? scene.textures[m.emissiveTexture.index]  : nullptr;
+		layer.bump		= m.normalTexture.index		>= 0 ? scene.textures[state.firstTex + m.normalTexture.index]	 : nullptr;
+		layer.occlusion = m.occlusionTexture.index	>= 0 ? scene.textures[state.firstTex + m.occlusionTexture.index] : nullptr;
+		layer.emission	= m.emissiveTexture.index	>= 0 ? scene.textures[state.firstTex + m.emissiveTexture.index]  : nullptr;
 		
 		scene.materialLayers.push_back(layer);
 	}
 }
 
-void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFScene& scene, GLTFLoader::MeshConstructionFunction meshConstructor) {
+void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFScene& scene, BaseState state, GLTFLoader::MeshConstructionFunction meshConstructor) {
 	for (const auto& m : model.meshes) {
 		SharedMesh mesh = SharedMesh(meshConstructor());
 
@@ -302,7 +310,7 @@ void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFScene& scene, GLTFLo
 			GLTFMaterialLayer matLayer;
 
 			if (p.material >= 0) { //fcan ever be false?
-				matLayer = scene.materialLayers[p.material];
+				matLayer = scene.materialLayers[state.firstMatLayer + p.material];
 			}
 			material.allLayers.push_back(matLayer);
 
@@ -320,15 +328,15 @@ void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFScene& scene, GLTFLo
 		scene.meshes.push_back(mesh);
 		scene.materials.push_back(material);
 
-		LoadSkinningData(model, scene, *mesh);
+		LoadSkinningData(model, scene, state, *mesh);
 	}
 }
 
-void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m, GLTFScene& scene) {
+void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m, GLTFScene& scene, BaseState state) {
 	scene.sceneNodes.resize(m.nodes.size());
 
 	for (int i = 0; i < m.nodes.size(); ++i) {
-		auto& sceneNode = scene.sceneNodes[i];
+		auto& sceneNode = scene.sceneNodes[state.firstNode + i];
 		auto& fileNode = m.nodes[i];
 
 		sceneNode.name = fileNode.name;
@@ -368,14 +376,14 @@ void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m, GLTFScene& scene) {
 		sceneNode.children.resize(fileNode.children.size());
 
 		for (int j = 0; j < fileNode.children.size(); ++j) {
-			sceneNode.children[j] = &(scene.sceneNodes[fileNode.children[j]]);
+			sceneNode.children[j] = &(scene.sceneNodes[state.firstNode + fileNode.children[j]]);
 			sceneNode.children[j]->parent = &sceneNode;
 		}
 	}
 	//There's seemingly no guarantee that a child node comes after its parent...(RiggedSimple demonstrates this)
 	//So instead we need to traverse any top-level nodes and build up the world matrices from there
 	std::stack<GLTFNode*> nodesToVisit;
-	for (int i = 0; i < scene.sceneNodes.size(); ++i) {
+	for (int i = state.firstNode; i < scene.sceneNodes.size(); ++i) {
 		if (scene.sceneNodes[i].parent == nullptr) {
 			nodesToVisit.push(&scene.sceneNodes[i]);	//a top level node!
 		}
@@ -391,7 +399,7 @@ void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m, GLTFScene& scene) {
 	}
 }
 
-void GLTFLoader::LoadSkinningData(tinygltf::Model& model, GLTFScene& scene, Mesh& mesh) {
+void GLTFLoader::LoadSkinningData(tinygltf::Model& model, GLTFScene& scene, BaseState state, Mesh& mesh) {
 	if (model.skins.empty()) {
 		return;
 	}
@@ -406,7 +414,7 @@ void GLTFLoader::LoadSkinningData(tinygltf::Model& model, GLTFScene& scene, Mesh
 				break;
 			}
 		}
-		skinData.globalTransformInverse = Matrix::Inverse(scene.sceneNodes[rootIndex].worldMatrix);
+		skinData.globalTransformInverse = Matrix::Inverse(scene.sceneNodes[state.firstNode + rootIndex].worldMatrix);
 
 		skinData.worldInverseBindPose.resize(skin.joints.size());
 
@@ -437,13 +445,13 @@ void GLTFLoader::LoadSkinningData(tinygltf::Model& model, GLTFScene& scene, Mesh
 			skinData.localJointNames.push_back(node.name);
 			skinData.sceneToLocalLookup.insert({ skin.joints[i], i });
 			skinData.localToSceneLookup.insert({i, skin.joints[i] });
-			skinData.worldBindPose.push_back(scene.sceneNodes[skin.joints[i]].worldMatrix);
+			skinData.worldBindPose.push_back(scene.sceneNodes[state.firstNode+skin.joints[i]].worldMatrix);
 		}
 
 		std::vector<int>	localParentList;
 
 		for (int i = 0; i < skin.joints.size(); ++i) {
-			GLTFNode& node = scene.sceneNodes[skin.joints[i]];
+			GLTFNode& node = scene.sceneNodes[state.firstNode + skin.joints[i]];
 
 			if (node.parent == nullptr) {
 				localParentList.push_back(-1);
@@ -462,12 +470,12 @@ void GLTFLoader::LoadSkinningData(tinygltf::Model& model, GLTFScene& scene, Mesh
 		mesh.SetJointParents(localParentList);
 		mesh.SetBindPose(skinData.worldBindPose);
 		mesh.SetInverseBindPose(skinData.worldInverseBindPose);
-		LoadAnimationData(model, scene, mesh, skinData);
+		LoadAnimationData(model, scene, state, mesh, skinData);
 		skinID++;
 	}
 }
 
-void GLTFLoader::LoadAnimationData(tinygltf::Model& model, GLTFScene& scene, Mesh& mesh, GLTFSkin& skinData) {
+void GLTFLoader::LoadAnimationData(tinygltf::Model& model, GLTFScene& scene, BaseState state, Mesh& mesh, GLTFSkin& skinData) {
 	size_t jointCount = mesh.GetBindPose().size();
 	std::vector<int> jointParents = mesh.GetJointParents();
 
@@ -532,7 +540,7 @@ void GLTFLoader::LoadAnimationData(tinygltf::Model& model, GLTFScene& scene, Mes
 			for (int i = 0; i < mesh.GetJointCount(); ++i) {
 				int localNodeID = i;
 				int sceneNodeID = skinData.localToSceneLookup[localNodeID];
-				GLTFNode& node = scene.sceneNodes[sceneNodeID];
+				GLTFNode& node = scene.sceneNodes[state.firstNode + sceneNodeID];
 				localMatrices.push_back(node.worldMatrix);
 			}
 
@@ -543,7 +551,7 @@ void GLTFLoader::LoadAnimationData(tinygltf::Model& model, GLTFScene& scene, Mes
 				if (in > 0) { //This node has a modifier of some sort
 					int sceneNodeID = skinData.localToSceneLookup[localNodeID];
 
-					GLTFNode& node = scene.sceneNodes[sceneNodeID];
+					GLTFNode& node = scene.sceneNodes[state.firstNode + sceneNodeID];
 
 					Vector3 translation;
 					Vector3 scale(1, 1, 1);

@@ -83,11 +83,20 @@ namespace NCL::Rendering {
 			Maths::Matrix4				globalTransformInverse;
 		};
 
-		static void LoadImages(tinygltf::Model& m, GLTFScene& scene, const std::string& rootFile, TextureConstructionFunction texFunc);
-		static void LoadMaterials(tinygltf::Model& m, GLTFScene& scene);
-		static void LoadSceneNodeData(tinygltf::Model& m, GLTFScene& scene);
-		static void LoadVertexData(tinygltf::Model& m, GLTFScene& scene, GLTFLoader::MeshConstructionFunction meshConstructor);
-		static void LoadSkinningData(tinygltf::Model& m, GLTFScene& scene, Mesh& geometry);
-		static void LoadAnimationData(tinygltf::Model& m, GLTFScene& scene, Mesh& mesh, GLTFSkin& skin);
+		struct BaseState {
+			uint32_t firstNode;
+			uint32_t firstMesh;
+			uint32_t firstTex;
+			uint32_t firstMat;
+			uint32_t firstAnim;
+			uint32_t firstMatLayer;
+		};
+
+		static void LoadImages(tinygltf::Model& m, GLTFScene& scene, BaseState state, const std::string& rootFile, TextureConstructionFunction texFunc);
+		static void LoadMaterials(tinygltf::Model& m, GLTFScene& scene, BaseState state);
+		static void LoadSceneNodeData(tinygltf::Model& m, GLTFScene& scene, BaseState state);
+		static void LoadVertexData(tinygltf::Model& m, GLTFScene& scene, BaseState state, GLTFLoader::MeshConstructionFunction meshConstructor);
+		static void LoadSkinningData(tinygltf::Model& m, GLTFScene& scene, BaseState state, Mesh& geometry);
+		static void LoadAnimationData(tinygltf::Model& m, GLTFScene& scene, BaseState state, Mesh& mesh, GLTFSkin& skin);
 	};
 }
