@@ -9,6 +9,7 @@
 #include "../NCLCoreClasses/Mesh.h"
 #include "../NCLCoreClasses/MeshAnimation.h"
 #include "../NCLCoreClasses/Texture.h"
+#include "../NCLCoreClasses/Matrix.h"
 
 #include "../NCLCoreClasses/Vector.h"
 #include "../NCLCoreClasses/Matrix.h"

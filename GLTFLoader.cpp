@@ -9,7 +9,7 @@
 #include "tiny_gltf.h"
 
 #include "../NCLCoreClasses/Quaternion.h"
-
+#include "../NCLCoreClasses/Vector.h"
 #include "../NCLCoreClasses/Maths.h"
 
 #include "../NCLCoreClasses/TextureLoader.h"
@@ -256,8 +256,6 @@ void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFScene& scene, BaseSt
 
 		std::vector<unsigned int>		vIndices;
 
-		const Primitive& p = m.primitives[0];
-
 		size_t vArrayPos = 0;
 
 		//now load up the actual vertex data
@@ -293,7 +291,6 @@ void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFScene& scene, BaseSt
 			}
 			if (vPrims[VertexAttribute::Positions] != p.attributes.end()) {
 				Accessor& a = model.accessors[vPrims[VertexAttribute::Positions]->second];
-				size_t oldPos = vPositions.size();
 				CopyVectorData<Vector3, float>(vPositions, vArrayPos, a, model);
 				vArrayPos += a.count;
 			}
@@ -566,8 +563,8 @@ void GLTFLoader::LoadAnimationData(tinygltf::Model& model, GLTFScene& scene, Bas
 					if (in & SCALE_BIT) {
 						scale = frameJointScales[localNodeID];
 					}
-					Matrix4 transform = Matrix::Translation(translation) *
-						Maths::RotationMatrixFromQuaternion<Matrix4>(rotation) *
+					Matrix4 transform = Matrix::Translation(translation) * 					
+						Quaternion::RotationMatrix<Matrix4>(rotation) *
 						Matrix::Scale(scale);
 
 					if (node.parent) {//It's a local transform!
