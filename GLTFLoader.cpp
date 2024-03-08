@@ -171,6 +171,13 @@ bool GLTFLoader::Load(const std::string& filename, GLTFScene& intoScene, GLTFLoa
 		return false;
 	}
 
+	intoScene.animations.reserve(1000);
+	intoScene.materials.reserve(1000);
+	intoScene.materialLayers.reserve(1000);
+	intoScene.meshes.reserve(1000);
+	intoScene.sceneNodes.reserve(1000);
+	intoScene.textures.reserve(1000);
+
 	BaseState state;
 	state.firstAnim		= intoScene.animations.size();
 	state.firstMat		= intoScene.materials.size();
@@ -330,14 +337,14 @@ void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFScene& scene, BaseSt
 }
 
 void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m, GLTFScene& scene, BaseState state) {
-	scene.sceneNodes.resize(m.nodes.size());
+	scene.sceneNodes.resize(state.firstNode + m.nodes.size());
 
 	for (int i = 0; i < m.nodes.size(); ++i) {
 		auto& sceneNode = scene.sceneNodes[state.firstNode + i];
 		auto& fileNode = m.nodes[i];
 
 		sceneNode.name = fileNode.name;
-		sceneNode.nodeID = i;
+		sceneNode.nodeID = state.firstNode + i;
 
 		Matrix4 mat;
 		if (!fileNode.matrix.empty()) { //node can be defined with a matrix - never targeted by animations!
