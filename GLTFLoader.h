@@ -56,21 +56,25 @@ namespace NCL::Rendering {
 	};	
 
 	struct GLTFScene {
-		std::vector<GLTFNode>			sceneNodes;
-		std::vector<SharedMesh>			meshes;
-		std::vector<SharedTexture>		textures;
-		std::vector<GLTFMaterial>		materials;
+		std::vector<SharedMesh>			meshes;		
 		std::vector<SharedMeshAnim>		animations;
+		std::vector<SharedTexture>		textures;
+
+		std::vector<GLTFMaterial>		materials;
 		std::vector<GLTFMaterialLayer>	materialLayers;
+
+		std::vector<GLTFNode>			sceneNodes;
 	};
 
 	class GLTFLoader	{
 	public:
-		typedef std::function<NCL::Rendering::Mesh* (void)>				MeshConstructionFunction;
-		typedef std::function<NCL::Rendering::Texture* (std::string&)>	TextureConstructionFunction;
+		typedef std::function<NCL::Rendering::SharedMesh (void)>				MeshConstructionFunction;
+		typedef std::function<NCL::Rendering::SharedTexture (std::string&)>		TextureConstructionFunction;
 
-		static bool Load(const std::string& filename, GLTFScene& intoScene, MeshConstructionFunction meshConstructor, TextureConstructionFunction textureConstruction);
-		
+		static bool Load(const std::string& filename, GLTFScene& intoScene);
+		static void SetMeshConstructionFunction(MeshConstructionFunction func);
+		static void SetTextureConstructionFunction(TextureConstructionFunction func);
+
 	protected:		
 		GLTFLoader()  = delete;
 		~GLTFLoader() = delete;
@@ -99,5 +103,8 @@ namespace NCL::Rendering {
 		static void LoadVertexData(tinygltf::Model& m, GLTFScene& scene, BaseState state, GLTFLoader::MeshConstructionFunction meshConstructor);
 		static void LoadSkinningData(tinygltf::Model& m, GLTFScene& scene, BaseState state, Mesh& geometry);
 		static void LoadAnimationData(tinygltf::Model& m, GLTFScene& scene, BaseState state, Mesh& mesh, GLTFSkin& skin);
+
+		static MeshConstructionFunction meshFunc;
+		static TextureConstructionFunction texFunc;
 	};
 }

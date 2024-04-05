@@ -28,6 +28,9 @@ using namespace NCL::Maths;
 using namespace NCL::Rendering;
 using NCL::Rendering::Texture;
 
+GLTFLoader::MeshConstructionFunction	GLTFLoader::meshFunc = nullptr;
+GLTFLoader::TextureConstructionFunction GLTFLoader::texFunc  = nullptr;
+
 const std::string GLTFAttributeTags[] = {
 	"POSITION",
 	"COLOR",
@@ -37,6 +40,14 @@ const std::string GLTFAttributeTags[] = {
 	"WEIGHTS_0",
 	"JOINTS_0",
 };
+
+void GLTFLoader::SetMeshConstructionFunction(MeshConstructionFunction func) {
+	GLTFLoader::meshFunc = func;
+}
+
+void GLTFLoader::SetTextureConstructionFunction(TextureConstructionFunction func) {
+	GLTFLoader::texFunc = func;
+}
 
 template <class toType, class fromType>
 void ReadDataInternal(toType* destination, const Accessor& accessor, const Model& model, int firstElement, int elementCount) {
@@ -163,9 +174,12 @@ vecType GetInterpolatedVector(float t, int indexA, int indexB, const Accessor& a
 	return (a * (1.0f - t)) + (b * t);
 }
 
-bool GLTFLoader::Load(const std::string& filename, GLTFScene& intoScene, GLTFLoader::MeshConstructionFunction inMeshConstructor, TextureConstructionFunction inTextureConstruction) {
+bool GLTFLoader::Load(const std::string& filename, GLTFScene& intoScene) {
 	TinyGLTF gltf;
 	Model	 model;
+
+	assert(meshFunc);
+	assert(texFunc);
 
 	if (!gltf.LoadASCIIFromFile(&model, nullptr, nullptr, NCL::Assets::GLTFDIR + filename)) {
 		return false;
@@ -186,11 +200,11 @@ bool GLTFLoader::Load(const std::string& filename, GLTFScene& intoScene, GLTFLoa
 	state.firstNode		= intoScene.sceneNodes.size();
 	state.firstTex		= intoScene.textures.size();
 
-	LoadImages(model, intoScene, state, filename, inTextureConstruction);
+	LoadImages(model, intoScene, state, filename, texFunc);
 	LoadMaterials(model, intoScene, state);
 	LoadSceneNodeData(model, intoScene, state);
 
-	LoadVertexData(model, intoScene, state, inMeshConstructor);
+	LoadVertexData(model, intoScene, state, meshFunc);
 
 	return true;
 }
