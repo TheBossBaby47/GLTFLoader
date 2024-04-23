@@ -51,8 +51,8 @@ namespace NCL::Rendering {
 		Matrix4 localMatrix;
 		Matrix4 worldMatrix;
 
-		GLTFNode* parent = nullptr;
-		std::vector<GLTFNode*> children;
+		int32_t parent = -1;
+		std::vector<int32_t> children;
 	};	
 
 	struct GLTFScene {

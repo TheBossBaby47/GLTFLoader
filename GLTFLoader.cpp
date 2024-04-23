@@ -185,13 +185,6 @@ bool GLTFLoader::Load(const std::string& filename, GLTFScene& intoScene) {
 		return false;
 	}
 
-	intoScene.animations.reserve(1000);
-	intoScene.materials.reserve(1000);
-	intoScene.materialLayers.reserve(1000);
-	intoScene.meshes.reserve(1000);
-	intoScene.sceneNodes.reserve(1000);
-	intoScene.textures.reserve(1000);
-
 	BaseState state;
 	state.firstAnim		= intoScene.animations.size();
 	state.firstMat		= intoScene.materials.size();
@@ -394,15 +387,15 @@ void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m, GLTFScene& scene, BaseSta
 		sceneNode.children.resize(fileNode.children.size());
 
 		for (int j = 0; j < fileNode.children.size(); ++j) {
-			sceneNode.children[j] = &(scene.sceneNodes[state.firstNode + fileNode.children[j]]);
-			sceneNode.children[j]->parent = &sceneNode;
+			GLTFNode* node = &(scene.sceneNodes[state.firstNode + fileNode.children[j]]);
+			node->parent = state.firstNode + i;
 		}
 	}
 	//There's seemingly no guarantee that a child node comes after its parent...(RiggedSimple demonstrates this)
 	//So instead we need to traverse any top-level nodes and build up the world matrices from there
 	std::stack<GLTFNode*> nodesToVisit;
 	for (int i = state.firstNode; i < scene.sceneNodes.size(); ++i) {
-		if (scene.sceneNodes[i].parent == nullptr) {
+		if (scene.sceneNodes[i].parent == -1) {
 			nodesToVisit.push(&scene.sceneNodes[i]);	//a top level node!
 		}
 	}
@@ -410,7 +403,7 @@ void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m, GLTFScene& scene, BaseSta
 		auto& sceneNode =	nodesToVisit.top();
 		nodesToVisit.pop();
 		for (int i = 0; i < sceneNode->children.size(); ++i) {
-			auto cNode = sceneNode->children[i];
+			GLTFNode* cNode = &scene.sceneNodes[sceneNode->children[i]];
 			cNode->worldMatrix = sceneNode->worldMatrix * cNode->localMatrix;
 			nodesToVisit.push(cNode);
 		}
@@ -471,11 +464,11 @@ void GLTFLoader::LoadSkinningData(tinygltf::Model& model, GLTFScene& scene, Base
 		for (int i = 0; i < skin.joints.size(); ++i) {
 			GLTFNode& node = scene.sceneNodes[state.firstNode + skin.joints[i]];
 
-			if (node.parent == nullptr) {
+			if (node.parent == -1) {
 				localParentList.push_back(-1);
 			}
 			else {
-				auto result = skinData.sceneToLocalLookup.find(node.parent->nodeID);
+				auto result = skinData.sceneToLocalLookup.find(node.parent);
 				if (result == skinData.sceneToLocalLookup.end()) {
 					localParentList.push_back(-1);
 				}
@@ -590,7 +583,8 @@ void GLTFLoader::LoadAnimationData(tinygltf::Model& model, GLTFScene& scene, Bas
 
 					if (node.parent) {//It's a local transform!
 						//We need to work out this frame's matrix for the parent node - may have been animated
-						int localParentID = skinData.sceneToLocalLookup[node.parent->nodeID];
+						GLTFNode* parent = &scene.sceneNodes[node.parent];
+						int localParentID = skinData.sceneToLocalLookup[parent->nodeID];
 						transform = localMatrices[startMatrix + localParentID] * transform;
 					}
 					localMatrices[startMatrix + i] = transform;
