@@ -101,8 +101,10 @@ namespace NCL::Rendering {
 		static void LoadMaterials(tinygltf::Model& m, GLTFScene& scene, BaseState state);
 		static void LoadSceneNodeData(tinygltf::Model& m, GLTFScene& scene, BaseState state);
 		static void LoadVertexData(tinygltf::Model& m, GLTFScene& scene, BaseState state, GLTFLoader::MeshConstructionFunction meshConstructor);
-		static void LoadSkinningData(tinygltf::Model& m, GLTFScene& scene, BaseState state, Mesh& geometry);
+		static void LoadSkinningData(tinygltf::Model& model, GLTFScene& scene, int32_t nodeID, int32_t skinID, BaseState state);
 		static void LoadAnimationData(tinygltf::Model& m, GLTFScene& scene, BaseState state, Mesh& mesh, GLTFSkin& skin);
+
+		static void AssignNodeMeshes(tinygltf::Model& m, GLTFScene& scene, BaseState state);
 
 		static MeshConstructionFunction meshFunc;
 		static TextureConstructionFunction texFunc;

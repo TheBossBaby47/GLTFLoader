@@ -198,6 +198,9 @@ bool GLTFLoader::Load(const std::string& filename, GLTFScene& intoScene) {
 	LoadSceneNodeData(model, intoScene, state);
 
 	LoadVertexData(model, intoScene, state, meshFunc);
+	AssignNodeMeshes(model, intoScene, state);
+
+	//LoadSkinningData(model, intoScene, state);
 
 	return true;
 }
@@ -240,11 +243,13 @@ void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFScene& scene, BaseSt
 	for (const auto& m : model.meshes) {
 		SharedMesh mesh = SharedMesh(meshConstructor());
 
-		GLTFMaterial material;
-
 		if (m.primitives.empty()) {
 			continue;
 		}
+
+		GLTFMaterial material;
+		material.allLayers.reserve(m.primitives.size());
+
 		size_t totalVertexCount = 0;
 
 		bool hasAttribute[VertexAttribute::MAX_ATTRIBUTES] = { false };
@@ -338,8 +343,22 @@ void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFScene& scene, BaseSt
 
 		scene.meshes.push_back(mesh);
 		scene.materials.push_back(material);
+	}
+}
 
-		LoadSkinningData(model, scene, state, *mesh);
+void GLTFLoader::AssignNodeMeshes(tinygltf::Model& model, GLTFScene& scene, BaseState state) {
+	for (int i = 0; i < model.nodes.size(); ++i) {
+		auto& sceneNode = scene.sceneNodes[state.firstNode + i];
+		auto& fileNode  = model.nodes[i];
+
+		if (fileNode.mesh >= 0) {
+			sceneNode.mesh = scene.meshes[state.firstMesh + fileNode.mesh].get();
+		}
+		if (fileNode.skin >= 0) {
+			auto& skin = model.skins[fileNode.skin];
+
+			LoadSkinningData(model, scene, i, fileNode.skin, state);
+		}
 	}
 }
 
@@ -387,7 +406,8 @@ void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m, GLTFScene& scene, BaseSta
 		sceneNode.children.resize(fileNode.children.size());
 
 		for (int j = 0; j < fileNode.children.size(); ++j) {
-			GLTFNode* node = &(scene.sceneNodes[state.firstNode + fileNode.children[j]]);
+			sceneNode.children[j] = state.firstNode + fileNode.children[j];
+			GLTFNode* node = &(scene.sceneNodes[ sceneNode.children[j] ]);
 			node->parent = state.firstNode + i;
 		}
 	}
@@ -410,22 +430,23 @@ void GLTFLoader::LoadSceneNodeData(tinygltf::Model& m, GLTFScene& scene, BaseSta
 	}
 }
 
-void GLTFLoader::LoadSkinningData(tinygltf::Model& model, GLTFScene& scene, BaseState state, Mesh& mesh) {
-	if (model.skins.empty()) {
-		return;
-	}
-	int skinID = 0;
-	for (auto& skin : model.skins) {
+void GLTFLoader::LoadSkinningData(tinygltf::Model& model, GLTFScene& scene, int32_t meshNode, int32_t skinID, BaseState state) {
+	auto& skin		= model.skins[skinID];
+	auto& sceneNode = scene.sceneNodes[state.firstNode + meshNode];
+
+	assert(sceneNode.mesh);
+	Mesh& mesh = *sceneNode.mesh;
+
+	//for (auto& skin : model.skins) {
 		GLTFSkin skinData;
 
-		int rootIndex = 0; //TODO: Is it guaranteed that the first node is the root...
-		for (int i = 0; i < model.nodes.size(); ++i) {
-			if (model.nodes[i].skin == skinID) {
-				rootIndex = i;
-				break;
-			}
-		}
-		skinData.globalTransformInverse = Matrix::Inverse(scene.sceneNodes[state.firstNode + rootIndex].worldMatrix);
+		//assert(state.firstNode + skin.skeleton < scene.sceneNodes.size());
+		//GLTFNode* rootNode = &scene.sceneNodes[state.firstNode + skin.skeleton];
+
+		//assert(rootNode->mesh);
+
+
+		skinData.globalTransformInverse = Matrix::Inverse(sceneNode.worldMatrix);
 
 		skinData.worldInverseBindPose.resize(skin.joints.size());
 
@@ -482,8 +503,7 @@ void GLTFLoader::LoadSkinningData(tinygltf::Model& model, GLTFScene& scene, Base
 		mesh.SetBindPose(skinData.worldBindPose);
 		mesh.SetInverseBindPose(skinData.worldInverseBindPose);
 		LoadAnimationData(model, scene, state, mesh, skinData);
-		skinID++;
-	}
+	//}
 }
 
 void GLTFLoader::LoadAnimationData(tinygltf::Model& model, GLTFScene& scene, BaseState state, Mesh& mesh, GLTFSkin& skinData) {
@@ -497,11 +517,12 @@ void GLTFLoader::LoadAnimationData(tinygltf::Model& model, GLTFScene& scene, Bas
 			animLength = std::max(animLength, (float)(model.accessors[timeSrc].maxValues[0]));
 		}
 		float time = 0.0f;
-		float frameRate = 1.0f / 30.0f;
+		float frameRate = 30.0f;
+		float frameTime = 1.0f / frameRate;
 		unsigned int frameCount = 0;
 
 		std::vector<Matrix4> localMatrices;
-		localMatrices.reserve(jointCount * (animLength / frameRate));
+		localMatrices.reserve(jointCount * (animLength * frameRate));
 
 		std::vector<int> inAnim(jointCount, 0); //TODO: reduce to only nodes that matter
 
@@ -590,7 +611,7 @@ void GLTFLoader::LoadAnimationData(tinygltf::Model& model, GLTFScene& scene, Bas
 					localMatrices[startMatrix + i] = transform;
 				}
 			}
-			time += frameRate;
+			time += frameTime;
 			frameCount++;
 		}
 
