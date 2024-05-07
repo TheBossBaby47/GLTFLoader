@@ -524,6 +524,9 @@ void GLTFLoader::LoadAnimationData(tinygltf::Model& model, GLTFScene& scene, Bas
 		std::vector<Matrix4> localMatrices;
 		localMatrices.reserve(jointCount * (animLength * frameRate));
 
+		std::vector<Matrix4> worldMatrices;
+		worldMatrices.reserve(jointCount * (animLength * frameRate));
+
 		std::vector<int> inAnim(jointCount, 0); //TODO: reduce to only nodes that matter
 
 		static int TRANSLATION_BIT	= 1;
@@ -532,6 +535,7 @@ void GLTFLoader::LoadAnimationData(tinygltf::Model& model, GLTFScene& scene, Bas
 
 		while (time <= animLength) {
 			localMatrices.reserve((frameCount+1) * jointCount);
+			worldMatrices.reserve((frameCount + 1) * jointCount);
 
 			std::map<int, Vector3> frameJointTranslations;
 			std::map<int, Vector3> frameJointScales;
@@ -574,6 +578,7 @@ void GLTFLoader::LoadAnimationData(tinygltf::Model& model, GLTFScene& scene, Bas
 				int sceneNodeID = skinData.localToSceneLookup[localNodeID];
 				GLTFNode& node = scene.sceneNodes[state.firstNode + sceneNodeID];
 				localMatrices.push_back(node.worldMatrix);
+				worldMatrices.push_back(node.worldMatrix);
 			}
 
 			for (int i = 0; i < mesh.GetJointCount(); ++i) {
@@ -602,23 +607,26 @@ void GLTFLoader::LoadAnimationData(tinygltf::Model& model, GLTFScene& scene, Bas
 						Quaternion::RotationMatrix<Matrix4>(rotation) *
 						Matrix::Scale(scale);
 
+					localMatrices[startMatrix + i] = transform;
+
 					if (node.parent) {//It's a local transform!
 						//We need to work out this frame's matrix for the parent node - may have been animated
 						GLTFNode* parent = &scene.sceneNodes[node.parent];
 						int localParentID = skinData.sceneToLocalLookup[parent->nodeID];
-						transform = localMatrices[startMatrix + localParentID] * transform;
+						transform = worldMatrices[startMatrix + localParentID] * transform;
 					}
-					localMatrices[startMatrix + i] = transform;
+
+					worldMatrices[startMatrix + i] = transform;
 				}
 			}
 			time += frameTime;
 			frameCount++;
 		}
 
-		for (int i = 0; i < localMatrices.size(); ++i) {
-			localMatrices[i] = skinData.globalTransformInverse * localMatrices[i];
+		for (int i = 0; i < worldMatrices.size(); ++i) {
+			worldMatrices[i] = skinData.globalTransformInverse * worldMatrices[i];
 		}
 
-		scene.animations.push_back(std::make_unique<MeshAnimation>((unsigned int)jointCount, frameCount, frameRate, localMatrices));
+		scene.animations.push_back(std::make_unique<MeshAnimation>((unsigned int)jointCount, frameCount, frameRate, worldMatrices));
 	}
 }
