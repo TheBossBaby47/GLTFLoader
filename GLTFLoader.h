@@ -33,6 +33,7 @@ namespace NCL::Rendering {
 		SharedTexture emission;
 		SharedTexture metallic;
 
+		int albedoId = -1;
 		GLTFMaterialLayer() {
 		}
 	};
