@@ -229,12 +229,20 @@ void GLTFLoader::LoadMaterials(tinygltf::Model& m, GLTFScene& scene, BaseState s
 	for (const auto& m : m.materials) {
 		GLTFMaterialLayer layer;
 		layer.albedo	= m.pbrMetallicRoughness.baseColorTexture.index			>= 0 ? scene.textures[state.firstTex + m.pbrMetallicRoughness.baseColorTexture.index]		  : nullptr;
+		layer.albedoId = m.pbrMetallicRoughness.baseColorTexture.index;
+
 		layer.metallic	= m.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0 ? scene.textures[state.firstTex + m.pbrMetallicRoughness.metallicRoughnessTexture.index] : nullptr;
-			
+		layer.metallicId = m.pbrMetallicRoughness.metallicRoughnessTexture.index;
+
 		layer.bump		= m.normalTexture.index		>= 0 ? scene.textures[state.firstTex + m.normalTexture.index]	 : nullptr;
+		layer.bumpId = m.normalTexture.index;
+
 		layer.occlusion = m.occlusionTexture.index	>= 0 ? scene.textures[state.firstTex + m.occlusionTexture.index] : nullptr;
+		layer.occlusionId = m.occlusionTexture.index;
+
 		layer.emission	= m.emissiveTexture.index	>= 0 ? scene.textures[state.firstTex + m.emissiveTexture.index]  : nullptr;
-		
+		layer.emissionId = m.emissiveTexture.index;
+
 		scene.materialLayers.push_back(layer);
 	}
 }
@@ -276,7 +284,7 @@ void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFScene& scene, BaseSt
 		std::vector<unsigned int>		vIndices;
 
 		size_t vArrayPos = 0;
-
+		GLTFPrimInfo primInfo;
 		//now load up the actual vertex data
 		for (const auto& p : m.primitives) {
 			std::map<std::string, int>::const_iterator vPrims[VertexAttribute::MAX_ATTRIBUTES];
@@ -313,11 +321,12 @@ void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFScene& scene, BaseSt
 				CopyVectorData<Vector3, float>(vPositions, vArrayPos, a, model);
 				vArrayPos += a.count;
 			}
-
+			primInfo.vertexOffset = baseVertex;
 			if (p.indices >= 0) {
 				Accessor& a = model.accessors[p.indices];
 
 				size_t start = vIndices.size();
+				primInfo.indexOffset = vIndices.size();
 				vIndices.resize(start + a.count);
 
 				CopyVectorData<unsigned int, unsigned int>(vIndices, start, a, model);
@@ -327,9 +336,11 @@ void GLTFLoader::LoadVertexData(tinygltf::Model& model, GLTFScene& scene, BaseSt
 
 			if (p.material >= 0) { //fcan ever be false?
 				matLayer = scene.materialLayers[state.firstMatLayer + p.material];
+				primInfo.materialLayerID = p.material;
 			}
 			material.allLayers.push_back(matLayer);
-
+			scene.primeInfoList.push_back(primInfo);
+			primInfo.Reset();
 			mesh->AddSubMesh((int)firstIndex, (int)(vIndices.size() - firstIndex), (int)baseVertex);
 		}
 		mesh->SetVertexPositions(vPositions);

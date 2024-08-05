@@ -34,7 +34,25 @@ namespace NCL::Rendering {
 		SharedTexture metallic;
 
 		int albedoId = -1;
+		int bumpId = -1;
+		int occlusionId = -1;
+		int emissionId = -1;
+		int metallicId = -1;
+
 		GLTFMaterialLayer() {
+		}
+	};
+
+	struct GLTFPrimInfo
+	{
+		uint32_t vertexOffset;
+		uint32_t indexOffset;
+		int materialLayerID;
+
+		void Reset()
+		{
+			vertexOffset = indexOffset = 0;
+			materialLayerID = 0;
 		}
 	};
 
@@ -65,6 +83,7 @@ namespace NCL::Rendering {
 		std::vector<GLTFMaterialLayer>	materialLayers;
 
 		std::vector<GLTFNode>			sceneNodes;
+		std::vector<GLTFPrimInfo>		primeInfoList;
 	};
 
 	class GLTFLoader	{
